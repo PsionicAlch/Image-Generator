@@ -1,89 +1,59 @@
 from PIL import Image
-from datetime import datetime
+from flask import Flask, render_template
+from flask.wrappers import Response
 
 import numpy as np
 
-import os
-import json
+import io
+
+ROW, COLUMN = 450, 800
+
+app = Flask(__name__)
 
 
-class ImageGenerator:
-    ROW, COLUMN, BATCH_SIZE = 600, 800, 100
+def generate_images():
+    pixel_array = list()
+    for i in range(0, ROW * COLUMN):
+        pixel_array.append(0)
 
-    def __init__(self) -> None:
-        self.pixel_array = list()
-        for i in range(0, self.ROW * self.COLUMN):
-            self.pixel_array.append(0)
+    while True:
+        pixel_array[0] += 1
+        if pixel_array[0] > 255:
+            for i in range(0, len(pixel_array)):
+                if pixel_array[i] > 255:
+                    pixel_array[i] -= 255
+                    pixel_array[i + 1] += 1
 
-        self.batch_dict = dict()
+        if pixel_array[-1] > 255:
+            break
 
-    def run(self) -> None:
-        file_counter = 1
-        dir_counter = 1
-        current_batch = 0
+        pa_counter = 0
+        img_matrix = np.empty((ROW, COLUMN))
 
-        while True:
-            if current_batch != dir_counter:
-                self.log(f"Starting batch {dir_counter}")
-                current_batch = dir_counter
+        for row in range(0, ROW):
+            for column in range(0, COLUMN):
+                img_matrix[row][column] = pixel_array[pa_counter]
+                pa_counter += 1
 
-            self.pixel_array[0] += 1
-            if self.pixel_array[0] > 255:
-                for i in range(0, len(self.pixel_array)):
-                    if self.pixel_array[i] > 255:
-                        self.pixel_array[i] -= 255
-                        self.pixel_array[i + 1] += 1
+        img = Image.fromarray(img_matrix, "L")
 
-            if self.pixel_array[-1] > 255:
-                break
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG")
+        img_bytes = buf.getvalue()
 
-            pa_counter = 0
-            img_matrix = np.empty((self.ROW, self.COLUMN))
+        yield (b'--frame\r\n'
+               b'Content-Type: image/jpeg\r\n\r\n' + img_bytes + b'\r\n')
 
-            for row in range(0, self.ROW):
-                for column in range(0, self.COLUMN):
-                    img_matrix[row][column] = self.pixel_array[pa_counter]
-                    pa_counter += 1
 
-            img = Image.fromarray(img_matrix, "L")
-            self.batch_dict[str(file_counter)] = self.pixel_array.copy()
+@app.route('/')
+def index():
+    return render_template('index.html')
 
-            self.save_img(img, str(file_counter), str(dir_counter))
 
-            img.close()
-
-            file_counter += 1
-            if file_counter > self.BATCH_SIZE:
-                self.save_batch_dump(dir_counter)
-                self.log(f"Finished batch {dir_counter}")
-                file_counter = 1
-                dir_counter += 1
-
-    def save_img(self, img, name, dir) -> None:
-        if not os.path.exists(f"./{dir}"):
-            os.makedirs(f"./{dir}")
-
-        img.save(f"./{dir}/{name}.png", format="PNG")
-
-    def save_batch_dump(self, dir) -> None:
-        self.log("Starting batch dump.")
-
-        batch_json = json.dumps(self.batch_dict, indent=4)
-        with open(f"./{dir}/batch_dump.json", "w") as f:
-            f.write(f"{batch_json}\n")
-
-        self.batch_dict = dict()
-        self.log("Finished batch dump.")
-
-    def log(self, msg) -> None:
-        message = f"{datetime.today().strftime('%Y-%m-%d %H:%M:%S')} - {msg}"
-
-        with open("./log.txt", "a") as f:
-            f.write(f"{message}\n")
-
-        print(message)
+@app.route('/video-feed')
+def video_feed():
+    return Response(generate_images(), mimetype='multipart/x-mixed-replace;boundary=frame')
 
 
 if __name__ == "__main__":
-    img_gen = ImageGenerator()
-    img_gen.run()
+    app.run(debug=True)

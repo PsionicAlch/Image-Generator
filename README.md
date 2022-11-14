@@ -5,3 +5,7 @@ This project is based on a wild theory I had. I theorized that if you had infini
 # If you're brave enough...
 
 I may have an idea as to how we could get around the memory problem. After some googling it seems possible to stream to Youtube using OpenCV. What if we stream the images to Youtube as they get created. This will allow Youtube to worry about saving and stitching the images into a video. We won't have to worry about storage just about keeping the server and the internet connection running. I would not know what we would do if the server accidentally died.
+
+# 14/11/2022
+
+I managed to get a working stream up and running. I found out that you can stream images to a website and the website will just replace the images as they come in. I just have one problem, I don't know if the images will be sync accross websites. I am doubtful. This however serves as a proof of concept that this idea should work.
